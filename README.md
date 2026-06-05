@@ -1,6 +1,6 @@
 # CodexUsage
 
-CodexUsage is a Codex skill for reporting local Codex token usage and estimated spend. It shows totals by model and by month, including cached input, output, reasoning, unknown tokens, and estimated dollar cost.
+CodexUsage is a Codex skill for reporting local Codex token usage and estimated spend. It shows totals by model and by month, including cached input, output, reasoning, unknown tokens, and estimated dollar cost if you used the OpenAI API instead.
 
 ## Example Output
 
