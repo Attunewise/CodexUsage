@@ -1,0 +1,11 @@
+{
+  "name": "codex-usage-skill",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "usage": "node scripts/codex_usage.js",
+    "test": "node --test test/*.test.js",
+    "check": "node --check scripts/*.js test/*.test.js"
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex Usage"
+  short_description: "Estimate Codex session spend from local logs."
+  default_prompt: "Use Codex Usage to scan ~/.codex/sessions, aggregate token usage by model, and price it with models.dev."
