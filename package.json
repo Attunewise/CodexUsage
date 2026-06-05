@@ -1,11 +1,31 @@
 {
-  "name": "codex-usage-skill",
+  "name": "@attunewise/codex-usage",
   "version": "0.1.0",
-  "private": true,
+  "description": "Report local Codex token usage and estimated spend by model and month.",
   "type": "commonjs",
+  "bin": {
+    "codex-usage": "scripts/codex_usage.js"
+  },
+  "files": [
+    "README.md",
+    "SKILL.md",
+    "agents/",
+    "scripts/"
+  ],
   "scripts": {
     "usage": "node scripts/codex_usage.js",
     "test": "node --test test/*.test.js",
     "check": "node --check scripts/*.js test/*.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Attunewise/CodexUsage.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Attunewise/CodexUsage/issues"
+  },
+  "homepage": "https://github.com/Attunewise/CodexUsage#readme",
+  "publishConfig": {
+    "access": "public"
   }
 }
