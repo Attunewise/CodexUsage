@@ -135,3 +135,37 @@ test('CLI aggregates usage, prices it, and reuses session cache', () => {
   assert.match(markdown, /\| Month \| Sessions \| Models \|/)
   assert.match(markdown, /\| 2026-07 \|/)
 })
+
+test('CLI installs the skill as a copied directory by default', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-usage-install-'))
+  const target = path.join(root, 'skills')
+
+  const installed = childProcess.execFileSync(process.execPath, [
+    script,
+    'install-skill',
+    '--target', target
+  ], { encoding: 'utf8' })
+  const skillDir = path.join(target, 'codex-usage')
+
+  assert.match(installed, /skill is installed/)
+  assert.equal(fs.existsSync(path.join(skillDir, 'SKILL.md')), true)
+  assert.equal(fs.existsSync(path.join(skillDir, 'scripts', 'codex_usage.js')), true)
+  assert.equal(fs.lstatSync(skillDir).isSymbolicLink(), false)
+
+  const status = JSON.parse(childProcess.execFileSync(process.execPath, [
+    script,
+    'skill-status',
+    '--target', target,
+    '--json'
+  ], { encoding: 'utf8' }))
+  assert.equal(status.exists, true)
+  assert.equal(status.kind, 'copy')
+  assert.equal(status.packageName, '@attune-js/codex-usage')
+
+  childProcess.execFileSync(process.execPath, [
+    script,
+    'uninstall-skill',
+    '--target', target
+  ], { encoding: 'utf8' })
+  assert.equal(fs.existsSync(skillDir), false)
+})

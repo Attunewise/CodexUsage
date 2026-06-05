@@ -1,6 +1,6 @@
 {
   "name": "@attune-js/codex-usage",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Report local Codex token usage and estimated spend by model and month.",
   "type": "commonjs",
   "bin": {

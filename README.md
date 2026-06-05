@@ -2,6 +2,19 @@
 
 CodexUsage is a Codex skill for reporting local Codex token usage and estimated spend. It shows totals by model and by month, including cached input, output, reasoning, unknown tokens, and estimated dollar cost if you used the OpenAI API instead.
 
+## Install
+
+```bash
+npm i -g @attune-js/codex-usage
+codex-usage install-skill
+```
+
+Run the report directly with:
+
+```bash
+codex-usage
+```
+
 ## Example Output
 
 ### Codex Usage

@@ -8,6 +8,8 @@ const CACHE_SCHEMA = 'codex-usage.cache.v2'
 const REPORT_SCHEMA = 'codex-usage.report.v1'
 const PRICING_TTL_MS = 24 * 60 * 60 * 1000
 const USD_PER_TOKEN_UNIT = 1_000_000
+const DEFAULT_SKILL_NAME = 'codex-usage'
+const SKILL_PACKAGE_ENTRIES = ['SKILL.md', 'README.md', 'package.json', 'agents', 'scripts']
 
 const skillRoot = path.resolve(__dirname, '..')
 const defaultCacheDir = path.join(skillRoot, '.cache')
@@ -112,10 +114,158 @@ const parseArgs = argv => {
 
 const usageText = () => `
 Usage:
+  codex-usage install-skill [--target DIR] [--name NAME] [--force] [--link]
+  codex-usage uninstall-skill [--target DIR] [--name NAME]
+  codex-usage skill-status [--target DIR] [--name NAME]
   node scripts/codex_usage.js [--json] [--sessions-root DIR] [--cache-dir DIR]
                               [--refresh-pricing] [--no-session-cache]
                               [--pricing-file FILE] [--top-sessions N]
 `.trim()
+
+const skillInstallUsageText = () => `
+Usage:
+  codex-usage install-skill [--target DIR] [--name NAME] [--force] [--link]
+  codex-usage uninstall-skill [--target DIR] [--name NAME] [--force]
+  codex-usage skill-status [--target DIR] [--name NAME] [--json]
+
+Defaults:
+  --target ~/.agents/skills
+  --name codex-usage
+
+Notes:
+  install-skill copies package files by default. Use --link only when you
+  explicitly want a symlink or Windows junction for local development.
+`.trim()
+
+const defaultSkillTarget = () => path.join(os.homedir(), '.agents', 'skills')
+
+const parseSkillCommandArgs = argv => {
+  const opts = {
+    target: defaultSkillTarget(),
+    name: DEFAULT_SKILL_NAME,
+    force: false,
+    link: false,
+    json: false,
+    help: false
+  }
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]
+    const next = () => {
+      i += 1
+      if (i >= argv.length) throw new Error(`${arg} requires a value`)
+      return argv[i]
+    }
+    if (arg === '--target') opts.target = path.resolve(expandHome(next()))
+    else if (arg === '--name') opts.name = next()
+    else if (arg === '--force') opts.force = true
+    else if (arg === '--link') opts.link = true
+    else if (arg === '--json') opts.json = true
+    else if (arg === '--help' || arg === '-h') opts.help = true
+    else throw new Error(`unknown argument: ${arg}`)
+  }
+  if (!/^[A-Za-z0-9._-]+$/.test(opts.name)) throw new Error('--name may only contain letters, numbers, dots, underscores, and dashes')
+  opts.dest = path.join(opts.target, opts.name)
+  return opts
+}
+
+const pathExists = file => {
+  try {
+    fs.lstatSync(file)
+    return true
+  } catch (_err) {
+    return false
+  }
+}
+
+const copySkillPackage = (dest, opts = {}) => {
+  fs.mkdirSync(path.dirname(dest), { recursive: true })
+  if (pathExists(dest)) {
+    if (!opts.force) throw new Error(`${dest} already exists; pass --force to replace it`)
+    fs.rmSync(dest, { recursive: true, force: true })
+  }
+  const temp = `${dest}.tmp-${process.pid}-${Date.now()}`
+  fs.mkdirSync(temp, { recursive: true })
+  try {
+    for (const entry of SKILL_PACKAGE_ENTRIES) {
+      const source = path.join(skillRoot, entry)
+      if (!pathExists(source)) continue
+      fs.cpSync(source, path.join(temp, entry), { recursive: true })
+    }
+    fs.renameSync(temp, dest)
+  } catch (err) {
+    fs.rmSync(temp, { recursive: true, force: true })
+    throw err
+  }
+}
+
+const linkSkillPackage = (dest, opts = {}) => {
+  fs.mkdirSync(path.dirname(dest), { recursive: true })
+  if (pathExists(dest)) {
+    if (!opts.force) throw new Error(`${dest} already exists; pass --force to replace it`)
+    fs.rmSync(dest, { recursive: true, force: true })
+  }
+  const type = process.platform === 'win32' ? 'junction' : 'dir'
+  fs.symlinkSync(skillRoot, dest, type)
+}
+
+const skillStatus = opts => {
+  const exists = pathExists(opts.dest)
+  let lstat = null
+  let skill = null
+  if (exists) {
+    lstat = fs.lstatSync(opts.dest)
+    skill = readJsonIfExists(path.join(opts.dest, 'package.json'))
+  }
+  return {
+    name: opts.name,
+    target: opts.target,
+    path: opts.dest,
+    exists,
+    kind: !exists ? 'missing' : lstat.isSymbolicLink() ? 'link' : 'copy',
+    packageName: skill && skill.name || null,
+    version: skill && skill.version || null
+  }
+}
+
+const formatSkillStatus = status => {
+  const lines = []
+  lines.push(status.exists
+    ? `${status.name} skill is installed at ${status.path}`
+    : `${status.name} skill is not installed at ${status.path}`)
+  if (status.exists) lines.push(`Install kind: ${status.kind}${status.version ? `, version ${status.version}` : ''}`)
+  return lines.join('\n')
+}
+
+const runSkillCommand = (command, argv) => {
+  const opts = parseSkillCommandArgs(argv)
+  if (opts.help) {
+    console.log(skillInstallUsageText())
+    return
+  }
+  if (command === 'install-skill') {
+    if (opts.link) linkSkillPackage(opts.dest, opts)
+    else copySkillPackage(opts.dest, opts)
+    const status = skillStatus(opts)
+    console.log(formatSkillStatus(status))
+    console.log('Restart Codex or start a new thread if the skill does not appear immediately.')
+    return
+  }
+  if (command === 'uninstall-skill') {
+    if (!pathExists(opts.dest)) {
+      console.log(`${opts.name} skill is not installed at ${opts.dest}`)
+      return
+    }
+    fs.rmSync(opts.dest, { recursive: true, force: true })
+    console.log(`${opts.name} skill removed from ${opts.dest}`)
+    return
+  }
+  if (command === 'skill-status') {
+    const status = skillStatus(opts)
+    console.log(opts.json ? JSON.stringify(status, null, 2) : formatSkillStatus(status))
+    return
+  }
+  throw new Error(`unknown command: ${command}`)
+}
 
 const walkJsonl = root => {
   const files = []
@@ -673,6 +823,10 @@ const formatReport = report => {
 }
 
 const main = async argv => {
+  if (['install-skill', 'uninstall-skill', 'skill-status'].includes(argv[0])) {
+    runSkillCommand(argv[0], argv.slice(1))
+    return
+  }
   const opts = parseArgs(argv)
   if (opts.help) {
     console.log(usageText())
@@ -692,13 +846,18 @@ if (require.main === module) {
 module.exports = {
   addUsage,
   buildReport,
+  copySkillPackage,
   estimateCost,
   formatReport,
+  formatSkillStatus,
+  parseSkillCommandArgs,
   markdownTable,
   normalizeUsage,
   parseArgs,
   resolvePricing,
+  runSkillCommand,
   scanSessionFile,
   scanSessions,
+  skillStatus,
   usageFromTokenInfo
 }
